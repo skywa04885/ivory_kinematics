@@ -2,6 +2,8 @@
 name = "ivory_kinematics"
 version = "0.1.0"
 edition = "2021"
+description="Kinematics library for Project Ivory"
+license="MIT"
 
 [dependencies]
 nalgebra = { version = "0.31.4", features = ["serde"] }
