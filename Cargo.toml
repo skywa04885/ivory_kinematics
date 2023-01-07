@@ -1,6 +1,6 @@
 [package]
 name = "ivory_kinematics"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 description="Kinematics library for Project Ivory"
 license="MIT"

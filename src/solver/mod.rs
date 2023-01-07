@@ -382,7 +382,7 @@ impl Solver {
     pub fn move_paw_absolute(
         &mut self,
         l: u8,
-        target_position: nalgebra::Vector3<f64>,
+        target_position: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
         let torso: &mut Torso = &mut self.torso;
@@ -418,7 +418,7 @@ impl Solver {
             }
         }
 
-        Err(Error::UnreachableTargetPosition(error, target_position))
+        Err(Error::UnreachableTargetPosition(error, target_position.clone()))
     }
 
     pub fn move_paw_relative(
@@ -433,7 +433,7 @@ impl Solver {
         let current_position: nalgebra::Vector3<f64> = Self::fk_paw_ef_position(leg, torso)?;
         let target_position: nalgebra::Vector3<f64> = current_position + relative_position;
 
-        self.move_paw_absolute(l, target_position, epsilon)
+        self.move_paw_absolute(l, &target_position, epsilon)
     }
 }
 
