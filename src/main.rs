@@ -12,34 +12,34 @@ fn main() {
             Leg::builder(0)
                 .thetas(Vector3::<f64>::new(
                     0.0,
-                    f64::to_radians(0.0),
-                    f64::to_radians(0.0),
+                    f64::to_radians(45.0),
+                    f64::to_radians(45.0),
                 ))
-                .lengths(Vector3::<f64>::new(10.0, 10.0, 10.0))
+                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
                 .build(),
             Leg::builder(1)
                 .thetas(Vector3::<f64>::new(
                     0.0,
-                    f64::to_radians(0.0),
-                    f64::to_radians(0.0),
+                    f64::to_radians(45.0),
+                    f64::to_radians(45.0),
                 ))
-                .lengths(Vector3::<f64>::new(10.0, 10.0, 10.0))
+                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
                 .build(),
             Leg::builder(2)
                 .thetas(Vector3::<f64>::new(
                     0.0,
-                    f64::to_radians(0.0),
-                    f64::to_radians(0.0),
+                    f64::to_radians(45.0),
+                    f64::to_radians(45.0),
                 ))
-                .lengths(Vector3::<f64>::new(10.0, 10.0, 10.0))
+                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
                 .build(),
             Leg::builder(3)
                 .thetas(Vector3::<f64>::new(
                     0.0,
-                    f64::to_radians(0.0),
-                    f64::to_radians(0.0),
+                    f64::to_radians(45.0),
+                    f64::to_radians(45.0),
                 ))
-                .lengths(Vector3::<f64>::new(10.0, 10.0, 10.0))
+                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
                 .build(),
         ])
         .build();

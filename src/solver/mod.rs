@@ -379,14 +379,14 @@ impl Solver {
         Self::fk_paw_ef_position(leg, torso)
     }
 
-    pub fn move_paw_absolute(
-        &mut self,
-        l: u8,
+    fn ik_paw_ef_position_with_eps(
+        torso: &Torso,
+        leg: &Leg,
         target_position: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
-    ) -> Result<(), Error> {
-        let torso: &mut Torso = &mut self.torso;
-        let mut leg = torso.leg(l)?.clone();
+        pseudo_inverse_epsilon: f64,
+    ) -> Result<nalgebra::Vector3<f64>, Error> {
+        let mut leg = leg.clone();
 
         let mut error: f64 = 0.0;
 
@@ -394,18 +394,13 @@ impl Solver {
         let mut delta_position: nalgebra::Vector3<f64> = target_position - current_position;
 
         for _ in 1..30 {
-            let delta_angles: nalgebra::Vector3<f64> = Self::ik_paw_ef_position(
-                &leg,
-                torso,
-                &delta_position,
-                self.pseudo_inverse_epsilon,
-            )?;
+            let delta_angles: nalgebra::Vector3<f64> =
+                Self::ik_paw_ef_position(&leg, torso, &delta_position, pseudo_inverse_epsilon)?;
 
             *leg.thetas_mut() += delta_angles;
 
             if epsilon.is_none() {
-                *torso.leg_mut(l)? = leg;
-                return Ok(());
+                return Ok(leg.thetas().clone());
             }
 
             current_position = Self::fk_paw_ef_position(&leg, torso)?;
@@ -413,12 +408,31 @@ impl Solver {
             error = delta_position.magnitude();
 
             if error < epsilon.as_ref().unwrap().clone() {
-                *torso.leg_mut(l)? = leg;
-                return Ok(());
+                return Ok(leg.thetas().clone());
             }
         }
 
-        Err(Error::UnreachableTargetPosition(error, target_position.clone()))
+        Err(Error::UnreachableTargetPosition(
+            error,
+            target_position.clone(),
+        ))
+    }
+
+    pub fn move_paw_absolute(
+        &mut self,
+        l: u8,
+        target_position: &nalgebra::Vector3<f64>,
+        epsilon: Option<f64>,
+    ) -> Result<(), Error> {
+        *self.torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
+            &self.torso,
+            self.torso.leg(l)?,
+            target_position,
+            epsilon,
+            self.pseudo_inverse_epsilon,
+        )?;
+
+        Ok(())
     }
 
     pub fn move_paw_relative(
@@ -434,6 +448,70 @@ impl Solver {
         let target_position: nalgebra::Vector3<f64> = current_position + relative_position;
 
         self.move_paw_absolute(l, &target_position, epsilon)
+    }
+
+    pub fn orient_torso_absolute(
+        &mut self,
+        absolute_orientation: &nalgebra::Vector3<f64>,
+        epsilon: Option<f64>,
+    ) -> Result<(), Error> {
+        let mut torso: Torso = self.torso.clone();
+        *torso.orientation_mut() = absolute_orientation.clone();
+
+        for l in 0u8..4u8 {
+            *torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
+                &torso,
+                torso.leg(l)?,
+                &self.fk_paw_ef_position_for_leg(l)?,
+                epsilon,
+                self.pseudo_inverse_epsilon,
+            )?;
+        }
+
+        self.torso = torso;
+
+        Ok(())
+    }
+
+    pub fn orient_torso_relative(
+        &mut self,
+        relative_orientation: &nalgebra::Vector3<f64>,
+        epsilon: Option<f64>,
+    ) -> Result<(), Error> {
+        let absolute_orientation: nalgebra::Vector3<f64> = self.torso.orientation() + relative_orientation;
+        self.orient_torso_absolute(&absolute_orientation, epsilon)
+    }
+
+    pub fn move_torso_absolute(
+        &mut self,
+        absolute_position: &nalgebra::Vector3<f64>,
+        epsilon: Option<f64>,
+    ) -> Result<(), Error> {
+        let mut torso: Torso = self.torso.clone();
+        *torso.position_mut() = absolute_position.clone();
+
+        for l in 0u8..4u8 {
+            *torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
+                &torso,
+                torso.leg(l)?,
+                &self.fk_paw_ef_position_for_leg(l)?,
+                epsilon,
+                self.pseudo_inverse_epsilon,
+            )?;
+        }
+
+        self.torso = torso;
+
+        Ok(())
+    }
+
+    pub fn move_torso_relative(
+        &mut self,
+        relative_position: &nalgebra::Vector3<f64>,
+        epsilon: Option<f64>,
+    ) -> Result<(), Error> {
+        let absolute_position: nalgebra::Vector3<f64> = self.torso.position() + relative_position;
+        self.move_torso_absolute(&absolute_position, epsilon)
     }
 }
 
