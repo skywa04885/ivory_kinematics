@@ -462,7 +462,7 @@ impl Solver {
             *torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
                 &torso,
                 torso.leg(l)?,
-                &self.fk_paw_ef_position_for_leg(l)?,
+                &Self::fk_paw_ef_position(torso.leg(l)?, &torso)?,
                 epsilon,
                 self.pseudo_inverse_epsilon,
             )?;
@@ -494,7 +494,7 @@ impl Solver {
             *torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
                 &torso,
                 torso.leg(l)?,
-                &self.fk_paw_ef_position_for_leg(l)?,
+                &Self::fk_paw_ef_position(torso.leg(l)?, &torso)?,
                 epsilon,
                 self.pseudo_inverse_epsilon,
             )?;
