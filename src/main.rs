@@ -52,13 +52,6 @@ fn main() {
     }
 
     {
-        let a = Instant::now();
-        let c = solver.ik_paw_ef_position_for_leg(0, &Vector3::<f64>::new(0.01, 0.01, 0.01), 0.001);
-        let b = a.elapsed();
-        println!("{:?}, {:#?}", b, c);
-    }
-
-    {
         println!("{:#?}", solver.fk_paw_ef_position_for_leg(0).unwrap());
         let a = Instant::now();
         let c = solver.move_paw_relative(0, &Vector3::<f64>::new(1.1, 5.1, 1.1), Some(0.01));

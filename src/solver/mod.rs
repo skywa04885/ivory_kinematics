@@ -11,6 +11,7 @@ pub struct Solver {
 }
 
 impl Solver {
+    /// Constructs a new solver.
     #[inline(always)]
     pub fn new(torso: Torso, pseudo_inverse_epsilon: f64, legs: [Leg; 4]) -> Self {
         Self {
@@ -20,16 +21,19 @@ impl Solver {
         }
     }
 
+    /// Constructs a new builder for a solver.
     #[inline(always)]
     pub fn builder(torso: Torso, legs: [Leg; 4]) -> SolverBuilder {
         SolverBuilder::new(torso, legs)
     }
 
+    /// Gets a reference to the torso.
     #[inline(always)]
     pub fn torso(&self) -> &Torso {
         &self.torso
     }
 
+    /// Gets a reference to the leg with the given index.
     pub fn leg(&self, l: u8) -> Result<&Leg, Error> {
         if l > 3 {
             return Err(Error::LegNumberOutOfBounds(l));
@@ -38,6 +42,7 @@ impl Solver {
         Ok(&self.legs[l as usize])
     }
 
+    /// Gets a mutable reference to the leg with the given index.
     pub fn leg_mut(&mut self, l: u8) -> Result<&mut Leg, Error> {
         if l > 3 {
             return Err(Error::LegNumberOutOfBounds(l));
@@ -46,6 +51,7 @@ impl Solver {
         Ok(&mut self.legs[l as usize])
     }
 
+    /// Computes the Mt forward kinematics matrix for the given leg and torso.
     fn m_t(leg: &Leg, torso: &Torso) -> Result<nalgebra::Matrix4<f64>, Error> {
         let (s_x, s_z) = (leg.signs().x, leg.signs().y);
 
@@ -86,6 +92,7 @@ impl Solver {
         ))
     }
 
+    /// Computes the Mt forward kinematics matrix for the given leg.
     #[inline(always)]
     pub fn m_t_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
         let torso: &Torso = &self.torso;
@@ -94,6 +101,7 @@ impl Solver {
         Self::m_t(leg, torso)
     }
 
+    /// Computes the M0 forward kinematics matrix for the given leg.
     fn m_0(leg: &Leg) -> Result<nalgebra::Matrix4<f64>, Error> {
         let s_x = leg.signs().x;
 
@@ -120,14 +128,15 @@ impl Solver {
         ))
     }
 
+    /// Computes the M0 forward kinematics matrix for the given leg.
     #[inline(always)]
     pub fn m_0_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
-        let torso: &Torso = &self.torso;
         let leg: &Leg = self.leg(l)?;
 
         Self::m_0(leg)
     }
 
+    /// Computes the M1 forward kinematics matrix for the given leg.
     fn m_1(leg: &Leg) -> Result<nalgebra::Matrix4<f64>, Error> {
         let l_1 = leg.lengths().y;
         let theta_1 = leg.thetas().y;
@@ -152,14 +161,15 @@ impl Solver {
         ))
     }
 
+    /// Computes the M1 forward kinematics matrix for the given leg.
     #[inline(always)]
     pub fn m_1_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
-        let torso: &Torso = &self.torso;
         let leg: &Leg = self.leg(l)?;
 
         Self::m_1(leg)
     }
 
+    /// Computes the M2 forward kinematics matrix for the given leg.
     fn m_2(leg: &Leg) -> Result<nalgebra::Matrix4<f64>, Error> {
         let l_2 = leg.lengths().z;
         let theta_2 = leg.thetas().z;
@@ -184,14 +194,15 @@ impl Solver {
         ))
     }
 
+    /// Computes the M2 foward kinematics matrix for the given leg.
     #[inline(always)]
     pub fn m_2_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
-        let torso: &Torso = &self.torso;
         let leg: &Leg = self.leg(l)?;
 
         Self::m_2(leg)
     }
 
+    /// Computes the vertices for the given leg on the given torso.
     fn fk_vertices(leg: &Leg, torso: &Torso) -> Result<[nalgebra::Vector3<f64>; 5], Error> {
         let (m_t, m_0, m_1, m_2) = (
             Self::m_t(leg, torso)?,
@@ -214,6 +225,7 @@ impl Solver {
         Ok([vertex_0, vertex_1, vertex_2, vertex_3, vertex_4])
     }
 
+    /// Computes the vertices for the given leg using forward kinematics.
     #[inline(always)]
     pub fn fk_vertices_for_leg(&self, l: u8) -> Result<[nalgebra::Vector3<f64>; 5], Error> {
         let torso: &Torso = &self.torso;
@@ -222,6 +234,8 @@ impl Solver {
         Self::fk_vertices(leg, torso)
     }
 
+    /// Performs a single inverse kinematics step for the given leg, torso and change in the end
+    /// effector position.
     #[allow(unused_variables)]
     fn ik_paw_ef_position(
         leg: &Leg,
@@ -312,19 +326,7 @@ impl Solver {
         Ok(delta_angles)
     }
 
-    #[inline(always)]
-    pub fn ik_paw_ef_position_for_leg(
-        &self,
-        l: u8,
-        delta_position: &nalgebra::Vector3<f64>,
-        pseudo_inverse_epsilon: f64,
-    ) -> Result<nalgebra::Vector3<f64>, Error> {
-        let torso: &Torso = &self.torso;
-        let leg: &Leg = self.leg(l)?;
-
-        Self::ik_paw_ef_position(leg, torso, delta_position, pseudo_inverse_epsilon)
-    }
-
+    /// Computes the end effector (paw) position of the given leg on the given torso.
     #[allow(unused_variables)]
     fn fk_paw_ef_position(leg: &Leg, torso: &Torso) -> Result<nalgebra::Vector3<f64>, Error> {
         let (s_x, s_z) = (leg.signs().x, leg.signs().y);
@@ -392,6 +394,32 @@ impl Solver {
         ))
     }
 
+    /// Computes the end effector (paw) position for the given leg.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let end_effector_pos: nalgebra::Vector3<f64> =
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap();
+    ///
+    /// assert_eq!((nalgebra::Vector3::<f64>::new(-45.0, -35.355339, -25.0)
+    ///     - end_effector_pos).magnitude() < epsilon, true);
+    /// ```
     #[inline(always)]
     pub fn fk_paw_ef_position_for_leg(&self, l: u8) -> Result<nalgebra::Vector3<f64>, Error> {
         let torso: &Torso = &self.torso;
@@ -400,6 +428,8 @@ impl Solver {
         Self::fk_paw_ef_position(leg, torso)
     }
 
+    /// Moves the end effector of a paw to the given target position with the maximum error of
+    /// epsilon.
     fn ik_paw_ef_position_with_eps(
         torso: &Torso,
         leg: &Leg,
@@ -439,6 +469,38 @@ impl Solver {
         ))
     }
 
+    /// Moves the paw owned by the given leg to the given relative position.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let original_position: nalgebra::Vector3<f64> =
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap();
+    /// let absolute_position: nalgebra::Vector3<f64> = original_position + nalgebra::Vector3::<f64>::new(
+    ///     0.1,
+    ///     0.1,
+    ///     0.1,
+    /// );
+    /// solver.move_paw_absolute(0, &absolute_position, Some(epsilon)).unwrap();
+    ///
+    /// assert_eq!((absolute_position - solver.fk_paw_ef_position_for_leg(0)
+    ///     .unwrap()).magnitude() < epsilon, true);
+    /// ```
     pub fn move_paw_absolute(
         &mut self,
         l: u8,
@@ -456,6 +518,38 @@ impl Solver {
         Ok(())
     }
 
+    /// Moves the paw owned by the given leg to the given relative position.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let original_position: nalgebra::Vector3<f64> =
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap();
+    /// let relative_position: nalgebra::Vector3<f64> = nalgebra::Vector3::<f64>::new(
+    ///     0.1,
+    ///     0.1,
+    ///     0.1,
+    /// );
+    /// solver.move_paw_relative(0, &relative_position, Some(epsilon)).unwrap();
+    ///
+    /// assert_eq!(((original_position + relative_position) -
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap()).magnitude() < epsilon, true);
+    /// ```
     pub fn move_paw_relative(
         &mut self,
         l: u8,
