@@ -1,11 +1,8 @@
-use super::leg::Leg;
-
 #[derive(Debug, Clone)]
 pub struct Torso {
     orientation: nalgebra::Vector3<f64>,
     position: nalgebra::Vector3<f64>,
     dimensions: nalgebra::Vector2<f64>,
-    legs: [super::leg::Leg; 4],
 }
 
 impl Torso {
@@ -14,13 +11,11 @@ impl Torso {
         orientation: nalgebra::Vector3<f64>,
         position: nalgebra::Vector3<f64>,
         dimensions: nalgebra::Vector2<f64>,
-        legs: [super::leg::Leg; 4],
     ) -> Self {
         Self {
             orientation,
             position,
             dimensions,
-            legs,
         }
     }
 
@@ -58,29 +53,12 @@ impl Torso {
     pub fn dimensions(&self) -> &nalgebra::Vector2<f64> {
         &self.dimensions
     }
-
-    pub fn leg(&self, l: u8) -> Result<&super::leg::Leg, super::Error> {
-        if l > 3 {
-            return Err(super::Error::LegNumberOutOfBounds(l));
-        }
-
-        Ok(&self.legs[l as usize])
-    }
-
-    pub fn leg_mut(&mut self, l: u8) -> Result<&mut super::leg::Leg, super::Error> {
-        if l > 3 {
-            return Err(super::Error::LegNumberOutOfBounds(l));
-        }
-
-        Ok(&mut self.legs[l as usize])
-    }
 }
 
 pub struct TorsoBuilder {
     orientation: nalgebra::Vector3<f64>,
     position: nalgebra::Vector3<f64>,
     dimensions: nalgebra::Vector2<f64>,
-    legs: [super::leg::Leg; 4],
 }
 
 impl TorsoBuilder {
@@ -89,24 +67,32 @@ impl TorsoBuilder {
             orientation: nalgebra::Vector3::<f64>::zeros(),
             position: nalgebra::Vector3::<f64>::zeros(),
             dimensions: nalgebra::Vector2::<f64>::new(50.0, 90.0),
-            legs: [
-                super::leg::Leg::builder(0).build(),
-                super::leg::Leg::builder(1).build(),
-                super::leg::Leg::builder(2).build(),
-                super::leg::Leg::builder(3).build(),
-            ],
         }
     }
-   
+
     #[inline(always)]
-    pub fn legs(mut self, legs: [Leg; 4]) -> Self {
-        self.legs = legs;
+    pub fn orientation(mut self, orientation: nalgebra::Vector3<f64>) -> Self {
+        self.orientation = orientation;
+
+        self
+    }
+
+    #[inline(always)]
+    pub fn position(mut self, position: nalgebra::Vector3<f64>) -> Self {
+        self.position = position;
+        
+        self
+    }
+
+    #[inline(always)]
+    pub fn dimensions(mut self, dimensions: nalgebra::Vector2<f64>) -> Self {
+        self.dimensions = dimensions;
 
         self
     }
 
     #[inline(always)]
     pub fn build(self) -> Torso {
-        Torso::new(self.orientation, self.position, self.dimensions, self.legs)
+        Torso::new(self.orientation, self.position, self.dimensions)
     }
 }

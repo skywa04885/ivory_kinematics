@@ -1,28 +1,49 @@
-use crate::model::{leg::Leg, torso::Torso, Error};
+use crate::{
+    model::{leg::Leg, torso::Torso},
+    Error,
+};
 
 #[derive(Debug, Clone)]
 pub struct Solver {
     torso: Torso,
+    legs: [Leg; 4],
     pseudo_inverse_epsilon: f64,
 }
 
 impl Solver {
     #[inline(always)]
-    pub fn new(torso: Torso, pseudo_inverse_epsilon: f64) -> Self {
+    pub fn new(torso: Torso, pseudo_inverse_epsilon: f64, legs: [Leg; 4]) -> Self {
         Self {
             torso,
             pseudo_inverse_epsilon,
+            legs,
         }
     }
 
     #[inline(always)]
-    pub fn builder(torso: Torso) -> SolverBuilder {
-        SolverBuilder::new(torso)
+    pub fn builder(torso: Torso, legs: [Leg; 4]) -> SolverBuilder {
+        SolverBuilder::new(torso, legs)
     }
 
     #[inline(always)]
     pub fn torso(&self) -> &Torso {
         &self.torso
+    }
+
+    pub fn leg(&self, l: u8) -> Result<&Leg, Error> {
+        if l > 3 {
+            return Err(Error::LegNumberOutOfBounds(l));
+        }
+
+        Ok(&self.legs[l as usize])
+    }
+
+    pub fn leg_mut(&mut self, l: u8) -> Result<&mut Leg, Error> {
+        if l > 3 {
+            return Err(Error::LegNumberOutOfBounds(l));
+        }
+
+        Ok(&mut self.legs[l as usize])
     }
 
     fn m_t(leg: &Leg, torso: &Torso) -> Result<nalgebra::Matrix4<f64>, Error> {
@@ -68,7 +89,7 @@ impl Solver {
     #[inline(always)]
     pub fn m_t_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::m_t(leg, torso)
     }
@@ -102,7 +123,7 @@ impl Solver {
     #[inline(always)]
     pub fn m_0_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::m_0(leg)
     }
@@ -134,7 +155,7 @@ impl Solver {
     #[inline(always)]
     pub fn m_1_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::m_1(leg)
     }
@@ -166,7 +187,7 @@ impl Solver {
     #[inline(always)]
     pub fn m_2_for_leg(&self, l: u8) -> Result<nalgebra::Matrix4<f64>, Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::m_2(leg)
     }
@@ -196,7 +217,7 @@ impl Solver {
     #[inline(always)]
     pub fn fk_vertices_for_leg(&self, l: u8) -> Result<[nalgebra::Vector3<f64>; 5], Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::fk_vertices(leg, torso)
     }
@@ -299,7 +320,7 @@ impl Solver {
         pseudo_inverse_epsilon: f64,
     ) -> Result<nalgebra::Vector3<f64>, Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::ik_paw_ef_position(leg, torso, delta_position, pseudo_inverse_epsilon)
     }
@@ -374,7 +395,7 @@ impl Solver {
     #[inline(always)]
     pub fn fk_paw_ef_position_for_leg(&self, l: u8) -> Result<nalgebra::Vector3<f64>, Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
         Self::fk_paw_ef_position(leg, torso)
     }
@@ -424,9 +445,9 @@ impl Solver {
         target_position: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
-        *self.torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
+        *self.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
             &self.torso,
-            self.torso.leg(l)?,
+            self.leg(l)?,
             target_position,
             epsilon,
             self.pseudo_inverse_epsilon,
@@ -442,93 +463,347 @@ impl Solver {
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
         let torso: &Torso = &self.torso;
-        let leg: &Leg = self.torso.leg(l)?;
+        let leg: &Leg = self.leg(l)?;
 
+        // Gets the current position and based from that computes the new absolute position for the
+        // paw.
         let current_position: nalgebra::Vector3<f64> = Self::fk_paw_ef_position(leg, torso)?;
         let target_position: nalgebra::Vector3<f64> = current_position + relative_position;
 
+        // Performs the absolute paw movement with the computed target position.
         self.move_paw_absolute(l, &target_position, epsilon)
     }
 
+    /// Changes the orientation of the torso and performs kinematics on the paws so that they
+    /// maintain their original positions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let orig_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// let absolute_orientation: nalgebra::Vector3<f64> = nalgebra::Vector3::<f64>::new(
+    ///     f64::to_radians(10.0),
+    ///     f64::to_radians(12.0),
+    ///     f64::to_radians(10.0),
+    /// );
+    /// solver.orient_torso_relative(&absolute_orientation, Some(epsilon)).unwrap();
+    ///
+    /// assert_eq!(nalgebra::Vector3::<f64>::new(
+    ///     f64::to_radians(10.0),
+    ///     f64::to_radians(12.0),
+    ///     f64::to_radians(10.0),
+    /// ), solver.torso().orientation().clone());
+    ///
+    /// let final_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// assert_eq!((orig_paw_positions[0] - final_paw_positions[0]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[1] - final_paw_positions[1]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[2] - final_paw_positions[2]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[3] - final_paw_positions[3]).magnitude() < epsilon, true);
+    /// ```
     pub fn orient_torso_absolute(
         &mut self,
         absolute_orientation: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
-        let mut torso: Torso = self.torso.clone();
-        *torso.orientation_mut() = absolute_orientation.clone();
+        let torso: &mut Torso = &mut self.torso;
+        let legs: &mut [Leg; 4] = &mut self.legs;
 
-        for l in 0u8..4u8 {
-            *torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
-                &torso,
-                torso.leg(l)?,
-                &self.fk_paw_ef_position_for_leg(l)?,
+        // Clones the torso and the legs so that we can perfors inverse kinematics on them but still
+        // keep the current state clean.
+        let mut result_torso: Torso = torso.clone();
+        let mut result_legs: [Leg; 4] = legs.clone();
+
+        // Changes the orientation in the (temprary) result torso.
+        *result_torso.orientation_mut() = absolute_orientation.clone();
+
+        // Updates all of the four legs so that they don't lose their previous paw positions.
+        for l in 0..4 {
+            let leg: &Leg = &legs[l];
+            let result_leg: &mut Leg = &mut result_legs[l];
+
+            // Computes the previous paw end effector position so that we can perform inverse
+            // kinematics to make it reach once more again.
+            let prev_absolute_position: nalgebra::Vector3<f64> =
+                Self::fk_paw_ef_position(leg, torso)?;
+
+            // Performs inverse kinematics to make the paw end effector position reach the same
+            // position as it did without the new orientation.
+            *result_leg.thetas_mut() = Self::ik_paw_ef_position_with_eps(
+                &result_torso,
+                &result_leg,
+                &prev_absolute_position,
                 epsilon,
                 self.pseudo_inverse_epsilon,
             )?;
         }
 
-        self.torso = torso;
+        // Puts the changed toros and legs back into the current solver, only because the desired
+        // target was reachable.
+        self.torso = result_torso;
+        self.legs = result_legs;
 
         Ok(())
     }
 
+    /// Changes the orientation of the torso relative to the current orientation and then performs
+    /// inverse kinematics on the paws so that they maintain their original positions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let orig_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// let relative_orientation: nalgebra::Vector3<f64> = nalgebra::Vector3::<f64>::new(
+    ///     f64::to_radians(10.0),
+    ///     f64::to_radians(10.0),
+    ///     f64::to_radians(10.0),
+    /// );
+    /// solver.orient_torso_relative(&relative_orientation, Some(epsilon)).unwrap();
+    ///
+    /// assert_eq!(nalgebra::Vector3::<f64>::new(
+    ///     f64::to_radians(10.0),
+    ///     f64::to_radians(10.0),
+    ///     f64::to_radians(10.0),
+    /// ), solver.torso().orientation().clone());
+    ///
+    /// let final_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// assert_eq!((orig_paw_positions[0] - final_paw_positions[0]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[1] - final_paw_positions[1]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[2] - final_paw_positions[2]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[3] - final_paw_positions[3]).magnitude() < epsilon, true);
+    /// ```
     pub fn orient_torso_relative(
         &mut self,
         relative_orientation: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
-        let absolute_orientation: nalgebra::Vector3<f64> = self.torso.orientation() + relative_orientation;
+        // Computes the absolute orientation by adding the relative to the current orientation.
+        let absolute_orientation: nalgebra::Vector3<f64> =
+            self.torso.orientation() + relative_orientation;
+
+        // Performs the absolute orientation change.
         self.orient_torso_absolute(&absolute_orientation, epsilon)
     }
 
+    /// Moves the torso to the given absolute position and performs inverse kinematics on each paw
+    /// so that they maintain their original positions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let orig_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// let absolute_position: nalgebra::Vector3<f64> = nalgebra::Vector3::<f64>::new(2.0, 2.0, 2.0);
+    /// solver.move_torso_absolute(&absolute_position, Some(epsilon)).unwrap();
+    ///
+    /// assert_eq!(nalgebra::Vector3::<f64>::new(2.0, 2.0, 2.0), solver.torso().position().clone());
+    ///
+    /// let final_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// assert_eq!((orig_paw_positions[0] - final_paw_positions[0]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[1] - final_paw_positions[1]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[2] - final_paw_positions[2]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[3] - final_paw_positions[3]).magnitude() < epsilon, true);
+    /// ```
     pub fn move_torso_absolute(
         &mut self,
         absolute_position: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
-        let mut torso: Torso = self.torso.clone();
-        *torso.position_mut() = absolute_position.clone();
+        let torso: &mut Torso = &mut self.torso;
+        let legs: &mut [Leg; 4] = &mut self.legs;
 
-        for l in 0u8..4u8 {
-            *torso.leg_mut(l)?.thetas_mut() = Self::ik_paw_ef_position_with_eps(
-                &torso,
-                torso.leg(l)?,
-                &self.fk_paw_ef_position_for_leg(l)?,
+        // Clones the torso and the legs so that we can perfors inverse kinematics on them but still
+        // keep the current state clean.
+        let mut result_torso: Torso = torso.clone();
+        let mut result_legs: [Leg; 4] = legs.clone();
+
+        // Changes the orientation in the (temprary) result torso.
+        *result_torso.position_mut() = absolute_position.clone();
+
+        // Updates all of the four legs so that they don't lose their previous paw positions.
+        for l in 0..4 {
+            let leg: &Leg = &legs[l];
+            let result_leg: &mut Leg = &mut result_legs[l];
+
+            // Computes the previous paw end effector position so that we can perform inverse
+            // kinematics to make it reach once more again.
+            let prev_absolute_position: nalgebra::Vector3<f64> =
+                Self::fk_paw_ef_position(leg, torso)?;
+
+            // Performs inverse kinematics to make the paw end effector position reach the same
+            // position as it did without the new orientation.
+            *result_leg.thetas_mut() = Self::ik_paw_ef_position_with_eps(
+                &result_torso,
+                &result_leg,
+                &prev_absolute_position,
                 epsilon,
                 self.pseudo_inverse_epsilon,
             )?;
         }
 
-        self.torso = torso;
+        // Puts the changed toros and legs back into the current solver, only because the desired
+        // target was reachable.
+        self.torso = result_torso;
+        self.legs = result_legs;
 
         Ok(())
     }
 
+    /// Moves the torso relative to the current torso position and performs inverse kinematics on
+    /// all the paws to ensure they mantain their original end-effector positions.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ivory_kinematics::{Error, Solver, Leg, Torso};
+    ///
+    /// let epsilon: f64 = 0.001;
+    ///
+    /// let torso: Torso = Torso::builder()
+    ///     .build();
+    ///
+    /// let legs: [Leg; 4] = [
+    ///     Leg::builder(0).build(),
+    ///     Leg::builder(1).build(),
+    ///     Leg::builder(2).build(),
+    ///     Leg::builder(3).build(),
+    /// ];
+    /// let mut solver = Solver::builder(torso, legs).build();
+    ///
+    /// let orig_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// let relative_position: nalgebra::Vector3<f64> = nalgebra::Vector3::<f64>::new(0.1, 0.1, 0.1);
+    /// solver.move_torso_relative(&relative_position, Some(epsilon)).unwrap();
+    ///
+    /// assert_eq!(nalgebra::Vector3::<f64>::new(0.1, 0.1, 0.1), solver.torso().position().clone());
+    ///
+    /// let final_paw_positions: [nalgebra::Vector3<f64>; 4] = [
+    ///     solver.fk_paw_ef_position_for_leg(0).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(1).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(2).unwrap(),
+    ///     solver.fk_paw_ef_position_for_leg(3).unwrap(),
+    /// ];
+    ///
+    /// assert_eq!((orig_paw_positions[0] - final_paw_positions[0]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[1] - final_paw_positions[1]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[2] - final_paw_positions[2]).magnitude() < epsilon, true);
+    /// assert_eq!((orig_paw_positions[3] - final_paw_positions[3]).magnitude() < epsilon, true);
+    /// ```
     pub fn move_torso_relative(
         &mut self,
         relative_position: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
     ) -> Result<(), Error> {
+        // Computes the absolute position by adding the current position to it.
         let absolute_position: nalgebra::Vector3<f64> = self.torso.position() + relative_position;
+
+        // Performs the absolute position change.
         self.move_torso_absolute(&absolute_position, epsilon)
     }
 }
 
 pub struct SolverBuilder {
     torso: Torso,
+    legs: [Leg; 4],
     pseudo_inverse_epsilon: f64,
 }
 
 impl SolverBuilder {
+    /// Creates a new solver builder.
     #[inline(always)]
-    pub fn new(torso: Torso) -> Self {
+    pub fn new(torso: Torso, legs: [Leg; 4]) -> Self {
         Self {
             torso,
+            legs,
             pseudo_inverse_epsilon: 0.001,
         }
     }
 
+    /// Sets the epsilon value for the pseudo inversion of the jacobian matrix.
     #[inline(always)]
     pub fn pseudo_inverse_epsilon(mut self, pseudo_inverse_epsilon: f64) -> Self {
         self.pseudo_inverse_epsilon = pseudo_inverse_epsilon;
@@ -536,8 +811,9 @@ impl SolverBuilder {
         self
     }
 
+    /// Builds the solver.
     #[inline(always)]
     pub fn build(self) -> Solver {
-        Solver::new(self.torso, self.pseudo_inverse_epsilon)
+        Solver::new(self.torso, self.pseudo_inverse_epsilon, self.legs)
     }
 }

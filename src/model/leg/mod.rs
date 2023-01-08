@@ -7,8 +7,16 @@ pub struct Leg {
 
 impl Leg {
     #[inline(always)]
-    pub fn new(signs: nalgebra::Vector2<f64>, thetas: nalgebra::Vector3<f64>, lengths: nalgebra::Vector3<f64>) -> Self {
-        Self { signs, thetas, lengths }
+    pub fn new(
+        signs: nalgebra::Vector2<f64>,
+        thetas: nalgebra::Vector3<f64>,
+        lengths: nalgebra::Vector3<f64>,
+    ) -> Self {
+        Self {
+            signs,
+            thetas,
+            lengths,
+        }
     }
 
     #[inline(always)]
@@ -52,10 +60,10 @@ impl LegBuilder {
                 1 => nalgebra::Vector2::<f64>::new(-1.0, 1.0),
                 2 => nalgebra::Vector2::<f64>::new(1.0, -1.0),
                 3 => nalgebra::Vector2::<f64>::new(1.0, 1.0),
-                _ => panic!("Invalid leg number")
+                _ => panic!("Invalid leg number"),
             },
-            thetas: nalgebra::Vector3::<f64>::zeros(),
-            lengths: nalgebra::Vector3::<f64>::zeros(),
+            thetas: nalgebra::Vector3::<f64>::new(0.0, f64::to_radians(-45.0), f64::to_radians(90.0)),
+            lengths: nalgebra::Vector3::<f64>::new(0.0, 25.0, 25.0),
         }
     }
 
@@ -69,6 +77,13 @@ impl LegBuilder {
     #[inline(always)]
     pub fn lengths(mut self, lengths: nalgebra::Vector3<f64>) -> Self {
         self.lengths = lengths;
+
+        self
+    }
+
+    #[inline(always)]
+    pub fn signs(mut self, signs: nalgebra::Vector2<f64>) -> Self {
+        self.signs = signs;
 
         self
     }

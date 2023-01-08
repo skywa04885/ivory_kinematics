@@ -1,9 +1,15 @@
 [package]
 name = "ivory_kinematics"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2021"
-description="Kinematics library for Project Ivory"
-license="MIT"
+description = "Kinematics library for Project Ivory"
+license = "MIT"
 
 [dependencies]
 nalgebra = { version = "0.31.4", features = ["serde"] }
+
+[profile.dev]
+opt.level = 0
+
+[profile.release]
+opt-level = 3

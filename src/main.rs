@@ -7,43 +7,42 @@ use ivory_kinematics::{
 use nalgebra::Vector3;
 
 fn main() {
-    let torso: Torso = Torso::builder()
-        .legs([
-            Leg::builder(0)
-                .thetas(Vector3::<f64>::new(
-                    0.0,
-                    f64::to_radians(45.0),
-                    f64::to_radians(45.0),
-                ))
-                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
-                .build(),
-            Leg::builder(1)
-                .thetas(Vector3::<f64>::new(
-                    0.0,
-                    f64::to_radians(45.0),
-                    f64::to_radians(45.0),
-                ))
-                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
-                .build(),
-            Leg::builder(2)
-                .thetas(Vector3::<f64>::new(
-                    0.0,
-                    f64::to_radians(45.0),
-                    f64::to_radians(45.0),
-                ))
-                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
-                .build(),
-            Leg::builder(3)
-                .thetas(Vector3::<f64>::new(
-                    0.0,
-                    f64::to_radians(45.0),
-                    f64::to_radians(45.0),
-                ))
-                .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
-                .build(),
-        ])
-        .build();
-    let mut solver: Solver = Solver::builder(torso).build();
+    let torso: Torso = Torso::builder().build();
+    let legs: [Leg; 4] = [
+        Leg::builder(0)
+            .thetas(Vector3::<f64>::new(
+                0.0,
+                f64::to_radians(45.0),
+                f64::to_radians(45.0),
+            ))
+            .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
+            .build(),
+        Leg::builder(1)
+            .thetas(Vector3::<f64>::new(
+                0.0,
+                f64::to_radians(45.0),
+                f64::to_radians(45.0),
+            ))
+            .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
+            .build(),
+        Leg::builder(2)
+            .thetas(Vector3::<f64>::new(
+                0.0,
+                f64::to_radians(45.0),
+                f64::to_radians(45.0),
+            ))
+            .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
+            .build(),
+        Leg::builder(3)
+            .thetas(Vector3::<f64>::new(
+                0.0,
+                f64::to_radians(45.0),
+                f64::to_radians(45.0),
+            ))
+            .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
+            .build(),
+    ];
+    let mut solver: Solver = Solver::builder(torso, legs).build();
 
     {
         let a = Instant::now();
@@ -64,6 +63,11 @@ fn main() {
         let a = Instant::now();
         let c = solver.move_paw_relative(0, &Vector3::<f64>::new(1.1, 5.1, 1.1), Some(0.01));
         let b = a.elapsed();
-        println!("{:?}, {:#?}, {:#?}", b, c, solver.fk_paw_ef_position_for_leg(0).unwrap());
+        println!(
+            "{:?}, {:#?}, {:#?}",
+            b,
+            c,
+            solver.fk_paw_ef_position_for_leg(0).unwrap()
+        );
     }
 }
