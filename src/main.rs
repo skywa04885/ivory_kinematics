@@ -1,13 +1,14 @@
 use std::time::Instant;
 
 use ivory_kinematics::{
-    model::{leg::Leg, torso::Torso},
+    model::{leg::Leg, torso::Torso, arm::Arm},
     solver::Solver,
 };
 use nalgebra::Vector3;
 
 fn main() {
     let torso: Torso = Torso::builder().build();
+    let arm: Arm = Arm::builder().build();
     let legs: [Leg; 4] = [
         Leg::builder(0)
             .thetas(Vector3::<f64>::new(
@@ -42,25 +43,36 @@ fn main() {
             .lengths(Vector3::<f64>::new(2.0, 10.0, 10.0))
             .build(),
     ];
-    let mut solver: Solver = Solver::builder(torso, legs).build();
+    let mut solver: Solver = Solver::builder(torso, legs, arm).build();
+
+    // {
+    //     let a = Instant::now();
+    //     let c = solver.fk_vertices_for_leg(0);
+    //     let b = a.elapsed();
+    //     println!("{:?}, {:#?}", b, c);
+    // }
+
+    // {
+    //     println!("{:#?}", solver.fk_paw_ef_position_for_leg(0).unwrap());
+    //     let a = Instant::now();
+    //     let c = solver.move_paw_relative(0, &Vector3::<f64>::new(1.1, 5.1, 1.1), Some(0.01));
+    //     let b = a.elapsed();
+    //     println!(
+    //         "{:?}, {:#?}, {:#?}",
+    //         b,
+    //         c,
+    //         solver.fk_paw_ef_position_for_leg(0).unwrap()
+    //     );
+    // }
 
     {
         let a = Instant::now();
-        let c = solver.fk_vertices_for_leg(0);
-        let b = a.elapsed();
-        println!("{:?}, {:#?}", b, c);
-    }
-
-    {
-        println!("{:#?}", solver.fk_paw_ef_position_for_leg(0).unwrap());
-        let a = Instant::now();
-        let c = solver.move_paw_relative(0, &Vector3::<f64>::new(1.1, 5.1, 1.1), Some(0.01));
+        let c = solver.arm_vertices();
         let b = a.elapsed();
         println!(
-            "{:?}, {:#?}, {:#?}",
+            "{:?}, {:#?}",
             b,
             c,
-            solver.fk_paw_ef_position_for_leg(0).unwrap()
         );
     }
 }
