@@ -10,6 +10,7 @@ pub use self::{
     model::{
         leg::{Leg, LegBuilder},
         torso::{Torso, TorsoBuilder},
+        arm::{Arm, ArmBuilder}
     },
     solver::{Solver, SolverBuilder},
 };
