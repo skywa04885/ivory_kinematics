@@ -1,7 +1,7 @@
 use std::time::Instant;
 
 use ivory_kinematics::{
-    model::{leg::Leg, torso::Torso, arm::Arm},
+    model::{arm::Arm, leg::Leg, torso::Torso},
     solver::Solver,
 };
 use nalgebra::Vector3;
@@ -66,13 +66,12 @@ fn main() {
     // }
 
     {
+        let end_effector_position = solver.fk_arm_ef_position().unwrap();
+        let target_end_effector_position =
+            end_effector_position + nalgebra::Vector3::<f64>::new(-3.0, -6.0, 1.0);
         let a = Instant::now();
-        let c = solver.arm_vertices();
+        let c = solver.ik_arm_ef_position_with_eps(&target_end_effector_position, Some(0.0001));
         let b = a.elapsed();
-        println!(
-            "{:?}, {:#?}",
-            b,
-            c,
-        );
+        println!("{:?}, {:?}", b, c,);
     }
 }

@@ -669,7 +669,7 @@ impl Solver {
                 self.arm.offsets(),
             )?;
 
-        let ik_arm_delta_thetas: nalgebra::Vector5<f64> = Self::s_ik_arm_ef_position_with_eps(
+        let ik_arm_thetas: nalgebra::Vector5<f64> = Self::s_ik_arm_ef_position_with_eps(
             result_torso.position(),
             result_torso.orientation(),
             self.arm.thetas(),
@@ -680,7 +680,7 @@ impl Solver {
             self.pseudo_inverse_epsilon,
         )?;
 
-        *self.arm.thetas_mut() += ik_arm_delta_thetas;
+        *self.arm.thetas_mut() = ik_arm_thetas;
 
         // Puts the changed toros and legs back into the current solver, only because the desired
         // target was reachable.
@@ -847,7 +847,7 @@ impl Solver {
                 self.arm.offsets(),
             )?;
 
-        let ik_arm_delta_thetas: nalgebra::Vector5<f64> = Self::s_ik_arm_ef_position_with_eps(
+        let ik_arm_thetas: nalgebra::Vector5<f64> = Self::s_ik_arm_ef_position_with_eps(
             result_torso.position(),
             result_torso.orientation(),
             self.arm.thetas(),
@@ -858,7 +858,7 @@ impl Solver {
             self.pseudo_inverse_epsilon,
         )?;
 
-        *self.arm.thetas_mut() += ik_arm_delta_thetas;
+        *self.arm.thetas_mut() = ik_arm_thetas;
 
         // Puts the changed toros and legs back into the current solver, only because the desired
         // target was reachable.
@@ -1413,7 +1413,7 @@ impl Solver {
 
         // Performs up to thirty optimization iterations, and if we still haven't reached
         //  the desired error, return and void all the found angles, target cannot be reached.
-        for _ in 1..30 {
+        for _ in 1..6000 {
             // Computes the delta angles.
             let cloned_arm_delta_thetas: nalgebra::Vector5<f64> = Self::s_ik_arm_ef_position(
                 torso_orientation,
@@ -1461,7 +1461,7 @@ impl Solver {
     /// Performs inverse kinematics on the arm to try and reach the given target position within the
     /// given error threshold epsilon, None if we just want to do one iteration.
     #[allow(unused)]
-    fn ik_arm_ef_position_with_eps(
+    pub fn ik_arm_ef_position_with_eps(
         &self,
         target_position: &nalgebra::Vector3<f64>,
         epsilon: Option<f64>,
